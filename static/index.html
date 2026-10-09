@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agente de voz xAI</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif}
+body{margin:0;background:#101319;color:#f4f5f7;min-height:100vh;display:grid;place-items:center}
+main{width:min(780px,calc(100% - 32px));padding:24px 0}
+.panel{background:#191e27;border:1px solid #303847;border-radius:18px;padding:24px}
+h1{margin:0 0 8px;font-size:clamp(24px,4vw,34px)}
+p{color:#b8c0ce;line-height:1.5}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+button{border:0;border-radius:10px;padding:12px 17px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+#start{background:#e8edf5;color:#151922}#stop{background:#353d4b;color:#fff}
+#status,#log{padding:12px 14px;background:#11151c;border-radius:10px;overflow-wrap:anywhere}
+#status{color:#b8d6ff}#log{white-space:pre-wrap;min-height:130px;max-height:340px;overflow:auto}
+.hint{font-size:13px}
+</style>
+</head>
+<body>
+<main><section class="panel">
+<h1>Agente de voz xAI</h1>
+<p>Pulsa iniciar y permite el micrófono. Habla con naturalidad; haz una pausa al terminar tu frase para que el agente responda. La conexión permanece abierta hasta que pulses desconectar.</p>
+<div class="row">
+<button id="start">Iniciar conversación</button>
+<button id="stop" disabled>Desconectar</button>
+</div>
+<div id="status" role="status">Desconectado</div>
+<h3>Transcripción y eventos</h3><div id="log" aria-live="polite"></div>
+<p class="hint">Si falla, copia los eventos y errores de esta pantalla y de la terminal. No compartas tu clave API.</p>
+</section></main>
+<script>
+(() => {
+  const startBtn = document.querySelector('#start');
+  const stopBtn = document.querySelector('#stop');
+  const statusEl = document.querySelector('#status');
+  const logEl = document.querySelector('#log');
+
+  let ws = null, stream = null, audioContext = null, source = null;
+  let processor = null, mute = null, micReady = false, intentionalClose = false;
+  let sessionReady = false, playAt = 0, reconnectTimer = null;
+  const RATE = 24000;
+
+  function status(s) { statusEl.textContent = s; }
+  function log(s) { logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+  function send(o) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(o));
+  }
+  function encodeBase64(int16) {
+    const bytes = new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength);
+    let bin = '';
+    for (let i=0; i<bytes.length; i+=0x6000) {
+      bin += String.fromCharCode(...bytes.subarray(i, Math.min(i+0x6000, bytes.length)));
+    }
+    return btoa(bin);
+  }
+  function resample(input, fromRate) {
+    if (fromRate === RATE) return input;
+    const ratio = fromRate / RATE;
+    const n = Math.floor(input.length / ratio);
+    const out = new Float32Array(n);
+    for (let i=0; i<n; i++) {
+      const pos=i*ratio, left=Math.floor(pos), right=Math.min(left+1,input.length-1);
+      out[i]=input[left]*(1-(pos-left))+input[right]*(pos-left);
+    }
+    return out;
+  }
+  function toPCM(input) {
+    const out = new Int16Array(input.length);
+    for (let i=0;i<input.length;i++) {
+      const s=Math.max(-1,Math.min(1,input[i]));
+      out[i]=s<0?s*32768:s*32767;
+    }
+    return out;
+  }
+  async function setupMic() {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}
+    });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    await audioContext.resume();
+    source = audioContext.createMediaStreamSource(stream);
+    processor = audioContext.createScriptProcessor(2048,1,1);
+    mute = audioContext.createGain();
+    mute.gain.value = 0;
+    processor.onaudioprocess = ev => {
+      if (!micReady || !ws || ws.readyState !== WebSocket.OPEN) return;
+      const pcm = toPCM(resample(ev.inputBuffer.getChannelData(0), audioContext.sampleRate));
+      if (pcm.length) send({type:'input_audio_buffer.append',audio:encodeBase64(pcm)});
+    };
+    source.connect(processor);
+    processor.connect(mute);
+    mute.connect(audioContext.destination);
+    micReady = true;
+    log('Micrófono activo; enviando audio PCM16 a 24 kHz.');
+  }
+  function playAudio(base64) {
+    if (!audioContext) return;
+    const raw=atob(base64), pcm=new Int16Array(raw.length/2);
+    for(let i=0;i<pcm.length;i++){
+      let v=raw.charCodeAt(i*2)|(raw.charCodeAt(i*2+1)<<8);
+      if(v>=32768)v-=65536;
+      pcm[i]=v;
+    }
+    const buf=audioContext.createBuffer(1,pcm.length,RATE), ch=buf.getChannelData(0);
+    for(let i=0;i<pcm.length;i++)ch[i]=pcm[i]/32768;
+    const node=audioContext.createBufferSource(); node.buffer=buf; node.connect(audioContext.destination);
+    if(playAt<audioContext.currentTime)playAt=audioContext.currentTime+0.03;
+    node.start(playAt); playAt+=buf.duration;
+  }
+  function sessionConfig() {
+    // Keep the session payload simple and use the realtime API's standard fields.
+    send({
+      type:'session.update',
+      session:{
+        instructions:'Eres un asistente de voz útil. Habla en español, responde de forma natural, clara y concisa.',
+        voice:'eve',
+        modalities:['text','audio'],
+        input_audio_format:'pcm16',
+        output_audio_format:'pcm16',
+        turn_detection:{type:'server_vad'}
+      }
+    });
+  }
+  async function handleEvent(e) {
+    const t=e.type || 'unknown';
+    if(t==='app.status'){status(e.message);return;}
+    if(t==='app.error'||t==='error'){
+      const msg=e.message || e.error?.message || JSON.stringify(e.error||e);
+      status('Error: '+msg); log('ERROR: '+msg); return;
+    }
+    log('xAI: '+t);
+    if(t==='session.created'){
+      status('Sesión creada; configurando audio…');
+      sessionConfig();
+    } else if(t==='session.updated'){
+      if(!sessionReady){
+        sessionReady=true;
+        try{
+          await setupMic();
+          status('Conectado. Puedes hablar.');
+          startBtn.disabled=true; stopBtn.disabled=false;
+        }catch(err){
+          status('No se pudo activar el micrófono: '+err.message);
+          log('Micrófono: '+err.message);
+        }
+      }
+    } else if(t==='input_audio_buffer.speech_started'){
+      status('Te estoy escuchando…');
+    } else if(t==='input_audio_buffer.speech_stopped'){
+      status('Procesando tu frase…');
+    } else if(t==='conversation.item.input_audio_transcription.completed'){
+      if(e.transcript)log('Tú: '+e.transcript);
+    } else if(t==='response.output_audio.delta'){
+      if(e.delta)playAudio(e.delta);
+    } else if(t==='response.output_audio_transcript.delta'){
+      if(e.delta)log('Agente: '+e.delta);
+    } else if(t==='response.output_audio_transcript.done'){
+      if(e.transcript)log('Agente: '+e.transcript);
+    } else if(t==='response.done'){
+      status('Respuesta terminada. Puedes seguir hablando.');
+    }
+  }
+  function connect() {
+    intentionalClose=false; sessionReady=false; playAt=0; logEl.textContent='';
+    startBtn.disabled=true; status('Conectando…');
+    const scheme=location.protocol==='https:'?'wss:':'ws:';
+    ws=new WebSocket(scheme+'//'+location.host+'/ws');
+    ws.onopen=()=>status('Conectado al servidor; esperando sesión de xAI…');
+    ws.onmessage=async ev=>{
+      try{await handleEvent(JSON.parse(ev.data));}
+      catch(err){log('Error procesando evento: '+err.message);}
+    };
+    ws.onerror=()=>{status('Error WebSocket. Revisa la terminal de Python.');log('WebSocket: error');};
+    ws.onclose=ev=>{
+      log('WebSocket cerrado. Código '+ev.code+(ev.reason?' — '+ev.reason:''));
+      stopAudio();
+      if(!intentionalClose){
+        status('La conexión se cerró. Pulsa Iniciar conversación para reconectar.');
+      } else status('Desconectado.');
+    };
+    stopBtn.disabled=false;
+  }
+  function stopAudio(){
+    micReady=false;
+    if(processor){processor.onaudioprocess=null;try{processor.disconnect();}catch{}processor=null;}
+    if(source){try{source.disconnect();}catch{}source=null;}
+    if(mute){try{mute.disconnect();}catch{}mute=null;}
+    if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+    if(audioContext){audioContext.close().catch(()=>{});audioContext=null;}
+    sessionReady=false; startBtn.disabled=false; stopBtn.disabled=true;
+  }
+  function disconnect(){
+    intentionalClose=true;
+    if(ws && ws.readyState<WebSocket.CLOSING)ws.close(1000,'Desconexión solicitada por el usuario');
+    ws=null; stopAudio(); status('Desconectado.');
+  }
+  startBtn.addEventListener('click',connect);
+  stopBtn.addEventListener('click',disconnect);
+  window.addEventListener('beforeunload',()=>{intentionalClose=true;stopAudio();if(ws)ws.close();});
+})();
+</script>
+</body>
+</html>
