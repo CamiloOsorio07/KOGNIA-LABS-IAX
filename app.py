@@ -1,4 +1,3 @@
-
 import asyncio
 import json
 import os
@@ -78,36 +77,42 @@ async def voice_socket(client: WebSocket):
             })
 
             async def browser_to_xai():
-                while True:
-                    message = await client.receive_text()
-                    try:
-                        event = json.loads(message)
-                        print(
-                            "NAVEGADOR -> xAI:",
-                            event.get("type", "unknown")
-                        )
-                    except json.JSONDecodeError:
-                        print("Mensaje no JSON recibido del navegador")
+                try:
+                    while True:
+                        message = await client.receive_text()
+                        try:
+                            event = json.loads(message)
+                            print(
+                                "NAVEGADOR -> xAI:",
+                                event.get("type", "unknown")
+                            )
+                        except json.JSONDecodeError:
+                            print("Mensaje no JSON recibido del navegador")
 
-                    await xai.send(message)
+                        await xai.send(message)
+                except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
+                    pass
 
             async def xai_to_browser():
-                async for raw in xai:
-                    try:
-                        event = json.loads(raw)
-                    except json.JSONDecodeError:
-                        continue
+                try:
+                    async for raw in xai:
+                        try:
+                            event = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
 
-                    event_type = event.get("type", "unknown")
-                    if event_type == "error":
-                        print("Error xAI:", json.dumps(
-                            event.get("error", event),
-                            ensure_ascii=False
-                        ))
-                    else:
-                        print("xAI -> NAVEGADOR:", event_type)
+                        event_type = event.get("type", "unknown")
+                        if event_type == "error":
+                            print("Error xAI:", json.dumps(
+                                event.get("error", event),
+                                ensure_ascii=False
+                            ))
+                        else:
+                            print("xAI -> NAVEGADOR:", event_type)
 
-                    await client.send_json(event)
+                        await client.send_json(event)
+                except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
+                    pass
 
             tasks.extend([
                 asyncio.create_task(browser_to_xai()),
@@ -126,14 +131,8 @@ async def voice_socket(client: WebSocket):
                 *pending, return_exceptions=True
             )
 
-            for task in done:
-                if not task.cancelled():
-                    exc = task.exception()
-                    if exc:
-                        raise exc
-
     except WebSocketDisconnect:
-        print("El navegador se desconectó.")
+        print("El navegador se desconectó de manera limpia.")
 
     except websockets.exceptions.ConnectionClosed as exc:
         print(
@@ -156,3 +155,14 @@ async def voice_socket(client: WebSocket):
 
         with suppress(Exception):
             await client.close()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=False
+    )
