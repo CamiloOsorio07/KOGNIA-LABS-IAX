@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 import os
@@ -13,21 +14,27 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-XAI_API_KEY = os.getenv("XAI_API_KEY")
-XAI_AGENT_ID = os.getenv("XAI_AGENT_ID", "agent_riobGKmGZlwleXLk").strip()
-
-if not XAI_API_KEY:
-    print("ADVERTENCIA: falta XAI_API_KEY en .env")
+XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
+XAI_AGENT_ID = os.getenv(
+    "XAI_AGENT_ID", "agent_riobGKmGZlwleXLk"
+).strip()
 
 XAI_URL = f"wss://api.x.ai/v1/realtime?agent_id={XAI_AGENT_ID}"
 
 app = FastAPI(title="xAI Voice Agent")
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")
 async def index():
-    return FileResponse(BASE_DIR / "static" / "index.html")
+    index_file = STATIC_DIR / "index.html"
+    if not index_file.is_file():
+        return {"error": "Falta static/index.html"}
+    return FileResponse(index_file)
 
 
 @app.get("/health")
@@ -46,16 +53,19 @@ async def voice_socket(client: WebSocket):
     if not XAI_API_KEY:
         await client.send_json({
             "type": "app.error",
-            "message": "Falta XAI_API_KEY en el archivo .env"
+            "message": "Falta configurar XAI_API_KEY en Render."
         })
         await client.close(code=1011)
         return
 
     tasks = []
+
     try:
         async with websockets.connect(
             XAI_URL,
-            additional_headers={"Authorization": f"Bearer {XAI_API_KEY}"},
+            additional_headers={
+                "Authorization": f"Bearer {XAI_API_KEY}"
+            },
             max_size=20 * 1024 * 1024,
             ping_interval=20,
             ping_timeout=60,
@@ -72,17 +82,13 @@ async def voice_socket(client: WebSocket):
                     message = await client.receive_text()
                     try:
                         event = json.loads(message)
-                        event_type = event.get("type", "unknown")
-                        if event_type in (
-                            "input_audio_buffer.append",
-                            "input_audio_buffer.commit",
-                            "input_audio_buffer.clear",
-                            "response.create",
-                            "session.update",
-                        ):
-                            print("NAVEGADOR -> xAI:", event_type)
+                        print(
+                            "NAVEGADOR -> xAI:",
+                            event.get("type", "unknown")
+                        )
                     except json.JSONDecodeError:
-                        print("NAVEGADOR -> xAI: mensaje no JSON")
+                        print("Mensaje no JSON recibido del navegador")
+
                     await xai.send(message)
 
             async def xai_to_browser():
@@ -94,60 +100,69 @@ async def voice_socket(client: WebSocket):
 
                     event_type = event.get("type", "unknown")
                     if event_type == "error":
-                        print("xAI error:", json.dumps(
-                            event.get("error", event), ensure_ascii=False
+                        print("Error xAI:", json.dumps(
+                            event.get("error", event),
+                            ensure_ascii=False
                         ))
                     else:
                         print("xAI -> NAVEGADOR:", event_type)
 
                     await client.send_json(event)
 
-            tasks = [
+            tasks.extend([
                 asyncio.create_task(browser_to_xai()),
                 asyncio.create_task(xai_to_browser()),
-            ]
+            ])
 
-            # Keep the tunnel open until either side genuinely disconnects.
             done, pending = await asyncio.wait(
                 tasks,
-                return_when=asyncio.FIRST_COMPLETED
+                return_when=asyncio.FIRST_COMPLETED,
             )
 
             for task in pending:
                 task.cancel()
-            await asyncio.gather(*pending, return_exceptions=True)
+
+            await asyncio.gather(
+                *pending, return_exceptions=True
+            )
 
             for task in done:
-                exc = task.exception()
-                if exc:
-                    raise exc
+                if not task.cancelled():
+                    exc = task.exception()
+                    if exc:
+                        raise exc
 
     except WebSocketDisconnect:
-        print("El navegador se desconectó (cierre del cliente).")
+        print("El navegador se desconectó.")
+
     except websockets.exceptions.ConnectionClosed as exc:
-        print(f"Conexión xAI cerrada: code={exc.code}, reason={exc.reason}")
-        with suppress(Exception):
-            await client.send_json({
-                "type": "app.error",
-                "message": f"xAI cerró la conexión (código {exc.code}). Revisa la terminal."
-            })
+        print(
+            f"Conexión xAI cerrada: "
+            f"code={exc.code}, reason={exc.reason}"
+        )
+
     except Exception as exc:
-        print("WebSocket error:", repr(exc))
-        with suppress(Exception):
-            await client.send_json({
-                "type": "app.error",
-                "message": f"Error de conexión: {exc}"
-            })
+        print(f"Error en WebSocket: {type(exc).__name__}: {exc}")
+
     finally:
         for task in tasks:
             if not task.done():
                 task.cancel()
+
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(
+                *tasks, return_exceptions=True
+            )
+
         with suppress(Exception):
             await client.close()
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8001, reload=False)
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", "8001")),
+    )
