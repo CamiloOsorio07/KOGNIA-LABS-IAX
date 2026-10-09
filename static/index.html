@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -19,9 +20,7 @@
       --danger: #ff7e91;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -36,9 +35,7 @@
       font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
 
-    button {
-      font: inherit;
-    }
+    button { font: inherit; }
 
     .app {
       width: min(1050px, 100%);
@@ -94,13 +91,11 @@
       box-shadow: 0 0 0 4px #56e6b01c;
     }
 
-    .dot.error {
-      background: var(--danger);
-    }
+    .dot.error { background: var(--danger); }
 
     .layout {
       display: grid;
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
       gap: 18px;
     }
 
@@ -201,7 +196,7 @@
         0 0 35px #6bdcf855,
         0 0 90px #8a62ff30,
         inset -12px -18px 35px #10142d;
-      transition: transform 0.25s;
+      transition: transform .25s;
     }
 
     .voice.listening .orb {
@@ -209,7 +204,7 @@
     }
 
     .voice.speaking .orb {
-      animation: pulse 0.8s ease-in-out infinite;
+      animation: pulse .8s ease-in-out infinite;
       filter: hue-rotate(22deg) brightness(1.16);
     }
 
@@ -255,7 +250,7 @@
       background: #ffffff0b;
       font-size: 12px;
       font-weight: 750;
-      transition: filter 0.2s, transform 0.2s;
+      transition: filter .2s, transform .2s;
     }
 
     button:hover:not(:disabled) {
@@ -264,7 +259,7 @@
     }
 
     button:disabled {
-      opacity: 0.4;
+      opacity: .4;
       cursor: not-allowed;
     }
 
@@ -326,22 +321,14 @@
     }
 
     .message {
-      max-width: 90%;
-      min-width: 0;
-      animation: appear 0.18s ease-out;
+      max-width: 95%;
+      align-self: flex-start;
+      animation: appear .18s ease-out;
     }
 
     @keyframes appear {
       from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-
-    .message.user {
-      align-self: flex-end;
-    }
-
-    .message.agent {
-      align-self: flex-start;
     }
 
     .who {
@@ -353,30 +340,16 @@
       font-weight: 800;
     }
 
-    .message.user .who {
-      text-align: right;
-      color: #c0baff;
-    }
-
     .bubble {
       padding: 12px 14px;
       border: 1px solid var(--line);
       border-radius: 15px;
+      border-bottom-left-radius: 5px;
       background: #ffffff08;
       font-size: 13px;
       line-height: 1.65;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
-    }
-
-    .message.user .bubble {
-      border-color: #a9a6ff35;
-      border-bottom-right-radius: 5px;
-      background: linear-gradient(135deg, #373d70, #35315c);
-    }
-
-    .message.agent .bubble {
-      border-bottom-left-radius: 5px;
     }
 
     .chat-foot {
@@ -400,34 +373,22 @@
         align-items: flex-start;
       }
 
-      header {
-        margin-bottom: 16px;
-      }
+      header { margin-bottom: 16px; }
 
-      .layout {
-        grid-template-columns: 1fr;
-      }
+      .layout { grid-template-columns: 1fr; }
 
-      .voice {
-        min-height: 480px;
-      }
+      .voice { min-height: 480px; }
 
-      .chat {
-        min-height: 420px;
-      }
+      .chat { min-height: 420px; }
 
-      .orb-wrap {
-        margin: 28px auto 22px;
-      }
+      .orb-wrap { margin: 28px auto 22px; }
 
-      .messages {
-        max-height: 360px;
-      }
+      .messages { max-height: 360px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
-        animation-duration: 0.01ms !important;
+        animation-duration: .01ms !important;
       }
     }
   </style>
@@ -440,7 +401,7 @@
         <div class="logo">✳</div>
         <div>
           Voz IA
-          <span style="color:#9aa6c4;font-weight:500">/ KOGNIA IA</span>
+          <span style="color:#9aa6c4;font-weight:500">/ xAI Realtime</span>
         </div>
       </div>
 
@@ -455,8 +416,8 @@
         <div class="eyebrow">Conversación en vivo</div>
         <h1>Habla con tu IA</h1>
         <p class="sub">
-          Tu mensaje aparecerá cuando termines de hablar.
-          Después podrás ver y escuchar la respuesta del asistente.
+          Habla con naturalidad y escucha las respuestas del asistente.
+          En el chat solo aparecerán las respuestas de la IA.
         </p>
 
         <div class="orb-wrap" aria-hidden="true">
@@ -481,14 +442,14 @@
         </div>
 
         <div class="notice">
-          Necesitas permitir el micrófono. En producción, abre la página mediante HTTPS.
+          Permite el acceso al micrófono. En producción, utiliza HTTPS.
         </div>
       </section>
 
       <section class="panel chat">
         <div class="chat-head">
-          <h2>Transcripción</h2>
-          <span id="messageCount">0 mensajes</span>
+          <h2>Respuestas de la IA</h2>
+          <span id="messageCount">0 respuestas</span>
         </div>
 
         <div
@@ -499,18 +460,18 @@
           aria-relevant="additions"
         >
           <div id="emptyState" class="empty">
-            Aquí aparecerá la conversación.
+            Aquí aparecerán las respuestas del asistente.
             <br>
             Conecta el agente y empieza a hablar.
           </div>
         </div>
 
         <div class="chat-foot">
-          La transcripción del usuario se muestra al recibir el evento final.
-          El texto del asistente aparece durante la respuesta.
+          Solo se muestran las respuestas del asistente. Tu transcripción
+          de voz no se muestra en pantalla.
           <br>
           <button id="clearBtn" type="button" style="margin-top:10px">
-            Limpiar conversación
+            Limpiar respuestas
           </button>
         </div>
       </section>
@@ -529,6 +490,7 @@
       const stateText = $("stateText");
       const hintText = $("hintText");
       const messages = $("messages");
+
       const connectBtn = $("connectBtn");
       const muteBtn = $("muteBtn");
       const disconnectBtn = $("disconnectBtn");
@@ -550,16 +512,10 @@
 
       let activeAgentBubble = null;
       let agentTranscript = "";
-      let currentResponseId = null;
       let responseTextSource = null;
 
-      // Evita duplicados del mismo item de conversación.
-      // No filtra por el contenido del texto, porque el usuario puede decir
-      // legítimamente la misma frase en turnos distintos.
-      const displayedUserItemIds = new Set();
-
-      // Protege frente a eventos finales repetidos del mismo item.
-      const displayedFallbackKeys = new Set();
+      // Seguimiento de respuestas para no mezclar eventos de turnos distintos.
+      const completedResponseIds = new Set();
 
       function setStatus(text, state = "idle") {
         statusText.textContent = text;
@@ -574,18 +530,18 @@
 
       function updateCount() {
         $("messageCount").textContent =
-          `${messageCount} ${messageCount === 1 ? "mensaje" : "mensajes"}`;
+          `${messageCount} ${messageCount === 1 ? "respuesta" : "respuestas"}`;
       }
 
-      function addMessage(role, text = "") {
+      function addAgentMessage(text = "") {
         $("emptyState")?.remove();
 
         const wrapper = document.createElement("div");
-        wrapper.className = `message ${role}`;
+        wrapper.className = "message agent";
 
         const who = document.createElement("div");
         who.className = "who";
-        who.textContent = role === "user" ? "Tú" : "Asistente";
+        who.textContent = "Asistente";
 
         const bubble = document.createElement("div");
         bubble.className = "bubble";
@@ -609,6 +565,19 @@
         return false;
       }
 
+      function bytesToBase64(bytes) {
+        let binary = "";
+        const chunkSize = 0x8000;
+
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(
+            ...bytes.subarray(i, Math.min(i + chunkSize, bytes.length))
+          );
+        }
+
+        return btoa(binary);
+      }
+
       function floatToPcm16Base64(float32) {
         const pcm = new Int16Array(float32.length);
 
@@ -620,21 +589,6 @@
         }
 
         return bytesToBase64(new Uint8Array(pcm.buffer));
-      }
-
-      function bytesToBase64(bytes) {
-        let binary = "";
-        const chunkSize = 0x8000;
-
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          const chunk = bytes.subarray(
-            i,
-            Math.min(i + chunkSize, bytes.length)
-          );
-          binary += String.fromCharCode(...chunk);
-        }
-
-        return btoa(binary);
       }
 
       function base64ToBytes(base64) {
@@ -676,9 +630,7 @@
           !ws ||
           ws.readyState !== WebSocket.OPEN ||
           !audioContext
-        ) {
-          return;
-        }
+        ) return;
 
         const samples = resampleTo24k(
           new Float32Array(float32),
@@ -696,7 +648,7 @@
       async function startMic() {
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error(
-            "No se puede acceder al micrófono. Utiliza HTTPS o localhost."
+            "No se puede acceder al micrófono. Usa HTTPS o localhost."
           );
         }
 
@@ -722,8 +674,6 @@
         source = audioContext.createMediaStreamSource(stream);
         processor = audioContext.createScriptProcessor(2048, 1, 1);
 
-        // ScriptProcessor necesita una conexión de salida.
-        // Se conecta a una ganancia cero para evitar reproducir el micrófono.
         const silentGain = audioContext.createGain();
         silentGain.gain.value = 0;
 
@@ -796,8 +746,7 @@
         node.buffer = buffer;
         node.connect(audioContext.destination);
 
-        const now = audioContext.currentTime;
-        playbackAt = Math.max(playbackAt, now + 0.03);
+        playbackAt = Math.max(playbackAt, audioContext.currentTime + 0.03);
         node.start(playbackAt);
         playbackAt += buffer.duration;
 
@@ -819,11 +768,19 @@
         };
       }
 
-      function showAgentTranscriptDelta(delta) {
+      function appendAgentDelta(delta, sourceType) {
         if (!delta) return;
 
+        // Evita mostrar dos copias del texto si llegan eventos de
+        // transcripción de audio y texto en la misma respuesta.
+        if (responseTextSource && responseTextSource !== sourceType) {
+          return;
+        }
+
+        responseTextSource = sourceType;
+
         if (!activeAgentBubble) {
-          activeAgentBubble = addMessage("agent", "");
+          activeAgentBubble = addAgentMessage("");
           agentTranscript = "";
         }
 
@@ -837,7 +794,7 @@
 
         if (finalText) {
           if (!activeAgentBubble) {
-            activeAgentBubble = addMessage("agent", finalText);
+            activeAgentBubble = addAgentMessage(finalText);
           } else {
             activeAgentBubble.textContent = finalText;
           }
@@ -847,43 +804,6 @@
         agentTranscript = "";
         responseTextSource = null;
         messages.scrollTop = messages.scrollHeight;
-      }
-
-      function getUserItemId(event) {
-        return (
-          event.item_id ||
-          event.item?.id ||
-          event.previous_item_id ||
-          null
-        );
-      }
-
-      function showCompletedUserTranscript(event) {
-        const transcript = String(event.transcript || event.text || "").trim();
-
-        if (!transcript) return;
-
-        const itemId = getUserItemId(event);
-
-        if (itemId) {
-          if (displayedUserItemIds.has(itemId)) {
-            console.debug("Transcripción duplicada ignorada:", itemId);
-            return;
-          }
-
-          displayedUserItemIds.add(itemId);
-        } else {
-          // Respaldo cuando el proveedor no envía un ID de item.
-          // Se limita a evitar el mismo evento repetido, no frases iguales.
-          const fallbackKey = event.event_id || event.id;
-
-          if (fallbackKey) {
-            if (displayedFallbackKeys.has(fallbackKey)) return;
-            displayedFallbackKeys.add(fallbackKey);
-          }
-        }
-
-        addMessage("user", transcript);
       }
 
       function handleEvent(event) {
@@ -907,35 +827,31 @@
           return;
         }
 
-        if (type === "session.created" || type === "session.updated") {
-          console.info("Sesión aceptada por xAI.");
-          return;
-        }
-
-        // No se muestra ninguna transcripción parcial mientras el usuario habla.
+        // Ignorar siempre la transcripción del usuario.
         if (
-          type === "conversation.item.input_audio_transcription.updated"
-        ) {
-          return;
-        }
-
-        // El mensaje del usuario solo se añade cuando llega la transcripción final.
-        if (
+          type === "conversation.item.input_audio_transcription.updated" ||
           type === "conversation.item.input_audio_transcription.completed"
         ) {
-          showCompletedUserTranscript(event);
           return;
         }
 
-        // Evitar acumular dos canales de texto distintos para una misma respuesta.
-        // Preferimos el texto asociado al audio si está disponible.
-        if (
-          type === "response.output_audio_transcript.delta" ||
-          type === "response.audio_transcript.delta"
-        ) {
-          if (responseTextSource === "text") return;
-          responseTextSource = "audio_transcript";
-          showAgentTranscriptDelta(event.delta || "");
+        if (type === "response.created") {
+          const responseId = event.response?.id;
+
+          if (responseId && completedResponseIds.has(responseId)) {
+            return;
+          }
+
+          activeAgentBubble = null;
+          agentTranscript = "";
+          responseTextSource = null;
+
+          setState("El asistente está preparando la respuesta", "Un momento…");
+          return;
+        }
+
+        if (type === "response.output_audio_transcript.delta") {
+          appendAgentDelta(event.delta || "", "audio");
           return;
         }
 
@@ -943,23 +859,18 @@
           type === "response.text.delta" ||
           type === "response.output_text.delta"
         ) {
-          if (responseTextSource === "audio_transcript") return;
-          responseTextSource = "text";
-          showAgentTranscriptDelta(event.delta || "");
+          appendAgentDelta(event.delta || "", "text");
           return;
         }
 
-        if (
-          type === "response.output_audio_transcript.done" ||
-          type === "response.audio_transcript.done"
-        ) {
+        if (type === "response.output_audio_transcript.done") {
           if (responseTextSource === "text") return;
           finishAgentTranscript(event.transcript || "");
           return;
         }
 
         if (type === "response.output_text.done") {
-          if (responseTextSource === "audio_transcript") return;
+          if (responseTextSource === "audio") return;
           finishAgentTranscript(event.text || "");
           return;
         }
@@ -972,21 +883,22 @@
           return;
         }
 
-        if (type === "response.created") {
-          currentResponseId = event.response?.id || null;
-          activeAgentBubble = null;
-          agentTranscript = "";
-          responseTextSource = null;
-          setState("El asistente está preparando la respuesta", "Un momento…");
-          return;
-        }
-
         if (type === "response.done") {
+          const responseId = event.response?.id;
+
+          if (responseId) {
+            completedResponseIds.add(responseId);
+
+            // Evitar que el conjunto crezca indefinidamente.
+            if (completedResponseIds.size > 1000) {
+              const first = completedResponseIds.values().next().value;
+              completedResponseIds.delete(first);
+            }
+          }
+
           if (activeAgentBubble && agentTranscript) {
             finishAgentTranscript(agentTranscript);
           }
-
-          currentResponseId = null;
 
           if (connected && !muted) {
             setState("Te estoy escuchando", "Puedes seguir hablando.");
@@ -999,7 +911,7 @@
         if (type === "input_audio_buffer.speech_started") {
           setState(
             "Te estoy escuchando",
-            "Habla con naturalidad. El texto aparecerá al terminar."
+            "Habla con naturalidad. El chat solo muestra las respuestas de la IA."
           );
           return;
         }
@@ -1007,7 +919,7 @@
         if (type === "input_audio_buffer.speech_stopped") {
           setState(
             "Procesando tu mensaje",
-            "Esperando la transcripción final…"
+            "Preparando la respuesta del asistente…"
           );
           return;
         }
@@ -1015,10 +927,10 @@
         if (
           type === "conversation.item.input_audio_transcription.failed"
         ) {
-          console.warn("No se pudo transcribir el audio:", event);
+          console.warn("Falló la transcripción de audio:", event);
           setState(
-            "No se pudo transcribir",
-            "Intenta hablar de nuevo con más claridad."
+            "No se pudo procesar el audio",
+            "Intenta hablar de nuevo."
           );
         }
       }
@@ -1036,9 +948,7 @@
           await startMic();
 
           const scheme = location.protocol === "https:" ? "wss" : "ws";
-          const newSocket = new WebSocket(
-            `${scheme}://${location.host}/ws`
-          );
+          const newSocket = new WebSocket(`${scheme}://${location.host}/ws`);
 
           ws = newSocket;
 
@@ -1049,27 +959,23 @@
             connecting = false;
 
             setStatus("Conectado", "live");
-            setState(
-              "Te estoy escuchando",
-              "Tu mensaje aparecerá cuando termines de hablar."
-            );
+            setState("Te estoy escuchando", "Las respuestas de la IA aparecerán aquí.");
 
             voicePanel.classList.add("listening");
             connectBtn.textContent = "Conectado";
             muteBtn.disabled = false;
             disconnectBtn.disabled = false;
 
-            // No enviamos response.create desde el navegador.
-            // El agente configurado en xAI debe gestionar la respuesta
-            // al detectar el final del turno de audio.
+            // No enviamos response.create aquí para evitar iniciar
+            // respuestas duplicadas desde el navegador.
             send({
               type: "session.update",
               session: {
                 type: "realtime",
                 instructions:
                   "Eres un asistente de voz amable y servicial. " +
-                  "Responde siempre en español, de forma directa y concisa. " +
-                  "Escucha la intervención completa del usuario antes de responder.",
+                  "Responde siempre en español, de forma clara y concisa. " +
+                  "Escucha al usuario y responde una vez por cada intervención.",
                 audio: {
                   input: {
                     format: {
@@ -1182,7 +1088,8 @@
         const empty = document.createElement("div");
         empty.id = "emptyState";
         empty.className = "empty";
-        empty.textContent = "Aquí aparecerá la conversación. Conecta el agente y empieza a hablar.";
+        empty.textContent =
+          "Aquí aparecerán las respuestas del asistente. Conecta el agente y empieza a hablar.";
 
         messages.appendChild(empty);
 
@@ -1191,9 +1098,7 @@
 
         activeAgentBubble = null;
         agentTranscript = "";
-
-        displayedUserItemIds.clear();
-        displayedFallbackKeys.clear();
+        responseTextSource = null;
       }
 
       connectBtn.addEventListener("click", connect);
@@ -1216,10 +1121,7 @@
         } else {
           if (audioContext) audioContext.resume().catch(() => {});
           voicePanel.classList.add("listening");
-          setState(
-            "Te estoy escuchando",
-            "Tu mensaje aparecerá cuando termines de hablar."
-          );
+          setState("Te estoy escuchando", "Las respuestas de la IA aparecerán aquí.");
         }
       });
 
