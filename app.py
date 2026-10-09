@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 XAI_API_KEY = os.getenv("XAI_API_KEY")
-XAI_AGENT_ID = os.getenv("XAI_AGENT_ID", "agent_riobGKmGZlwleXLk")
+XAI_AGENT_ID = os.getenv("XAI_AGENT_ID", "agent_riobGKmGZlwleXLk").strip()
 XAI_URL = f"wss://api.x.ai/v1/realtime?agent_id={XAI_AGENT_ID}"
 
 app = FastAPI(title="xAI Voice Agent")
@@ -25,12 +25,24 @@ async def index():
     return FileResponse(BASE_DIR / "static" / "index.html")
 
 
+@app.get("/health")
+async def health():
+    return {
+        "ok": True,
+        "api_key_configured": bool(XAI_API_KEY),
+        "agent_id_configured": bool(XAI_AGENT_ID),
+    }
+
+
 @app.websocket("/ws")
 async def voice_socket(client: WebSocket):
     await client.accept()
 
     if not XAI_API_KEY:
-        await client.send_json({"type": "app.error", "message": "Falta XAI_API_KEY en el archivo .env"})
+        await client.send_json({
+            "type": "app.error",
+            "message": "Falta XAI_API_KEY en el archivo .env"
+        })
         await client.close(code=1011)
         return
 
@@ -45,31 +57,34 @@ async def voice_socket(client: WebSocket):
             await client.send_json({"type": "app.status", "message": "Conectado a xAI"})
 
             async def browser_to_xai():
-                while True:
-                    message = await client.receive_text()
-                    # Only JSON events are forwarded. The API key never reaches the browser.
-                    await xai.send(message)
+                try:
+                    while True:
+                        message = await client.receive_text()
+                        await xai.send(message)
+                except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
+                    pass
 
             async def xai_to_browser():
-                async for raw in xai:
-                    try:
-                        event = json.loads(raw)
-                    except json.JSONDecodeError:
-                        continue
-                    # Forward audio, transcript, errors and lifecycle events to the UI.
-                    await client.send_json(event)
+                try:
+                    async for raw in xai:
+                        try:
+                            event = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
+                        await client.send_json(event)
+                except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
+                    pass
 
             tasks = [
                 asyncio.create_task(browser_to_xai()),
                 asyncio.create_task(xai_to_browser()),
             ]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
             for task in pending:
                 task.cancel()
-            for task in done:
-                exc = task.exception()
-                if exc:
-                    raise exc
+
+            await asyncio.gather(*pending, return_exceptions=True)
 
     except WebSocketDisconnect:
         pass
