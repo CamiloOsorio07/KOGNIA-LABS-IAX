@@ -16,10 +16,8 @@
       --text: #f2f5ff;
       --muted: #9ba9c4;
       --primary: #7167ff;
-      --primary-light: #958dff;
       --success: #32d49a;
       --danger: #ff657a;
-      --warning: #ffc76b;
     }
 
     * {
@@ -222,11 +220,6 @@
     .message.assistant .message-bubble {
       background: var(--panel-light);
       border-bottom-left-radius: 5px;
-    }
-
-    .message.partial .message-bubble {
-      border-style: dashed;
-      color: #c3c9ff;
     }
 
     .message-meta {
@@ -440,8 +433,8 @@
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">🎙</div>
         <div>
-          <h1>Voice Agent</h1>
-          <div class="subtitle">Asistente conversacional con inteligencia artificial</div>
+          <h1>KOGNIA IA</h1>
+          <div class="subtitle">Asistente Hospitalario con inteligencia artificial</div>
         </div>
       </div>
 
@@ -456,8 +449,8 @@
         <div class="panel-heading">
           <h2>Conversación en tiempo real</h2>
           <p>
-            Habla normalmente. Aquí aparecerán tu transcripción y las respuestas
-            de texto del asistente.
+            Tu mensaje aparecerá cuando termines de hablar.
+            Las respuestas de la IA se mostrarán a medida que se generen.
           </p>
         </div>
 
@@ -545,19 +538,14 @@
     </div>
 
     <div class="footer">
-      Voice Agent · xAI Realtime · Conexión protegida a través del backend
+      Voice Agent · xAI Realtime · Conexión a través del backend
     </div>
   </main>
 
   <script>
     "use strict";
 
-    // El backend FastAPI debe exponer el WebSocket en /ws.
-    // Si tu backend utiliza otra ruta, cambia WS_PATH.
     const WS_PATH = "/ws";
-
-    // Audio de entrada y salida esperado por la configuración habitual
-    // de xAI Realtime: PCM lineal, 16 bits, mono, 24 kHz.
     const TARGET_SAMPLE_RATE = 24000;
     const INPUT_BUFFER_SIZE = 4096;
 
@@ -594,10 +582,10 @@
     let sessionStarted = false;
     let manuallyDisconnected = false;
 
-    let currentUserMessage = null;
+    // El usuario no tiene un mensaje visible mientras habla.
+    // Solo se crea cuando llega la transcripción final.
     let currentAssistantMessage = null;
 
-    // Cola sencilla para reproducir los bloques de audio sin superponerlos.
     let playbackContext = null;
     let nextPlaybackTime = 0;
     const playbackSources = new Set();
@@ -625,7 +613,8 @@
 
       elements.connectBtn.disabled = isConnecting || Boolean(connected);
       elements.muteBtn.disabled = !connected || !mediaStream;
-      elements.disconnectBtn.disabled = !socket && !mediaStream && !isConnecting;
+      elements.disconnectBtn.disabled =
+        !socket && !mediaStream && !isConnecting;
 
       elements.muteBtn.textContent = isMuted
         ? "Activar micrófono"
@@ -643,11 +632,11 @@
       elements.conversation.scrollTop = elements.conversation.scrollHeight;
     }
 
-    function createMessage(role, text = "", partial = false) {
+    function createMessage(role, text = "") {
       removeEmptyState();
 
       const wrapper = document.createElement("div");
-      wrapper.className = `message ${role}` + (partial ? " partial" : "");
+      wrapper.className = `message ${role}`;
 
       const label = document.createElement("div");
       label.className = "message-label";
@@ -659,7 +648,6 @@
 
       const meta = document.createElement("div");
       meta.className = "message-meta";
-      meta.textContent = partial ? "Transcribiendo…" : "";
 
       wrapper.append(label, bubble, meta);
       elements.conversation.appendChild(wrapper);
@@ -668,18 +656,15 @@
       return { wrapper, bubble, meta };
     }
 
-    function updateMessage(message, text, partial = false) {
+    function updateMessage(message, text) {
       if (!message) return;
 
       message.bubble.textContent = text;
-      message.wrapper.classList.toggle("partial", partial);
-      message.meta.textContent = partial ? "Recibiendo texto…" : "";
       scrollConversation();
     }
 
     function finalizeMessage(message) {
       if (!message) return;
-      message.wrapper.classList.remove("partial");
       message.meta.textContent = "";
     }
 
@@ -687,7 +672,7 @@
       const trimmed = String(text || "").trim();
       if (!trimmed) return null;
 
-      const message = createMessage(role, trimmed, false);
+      const message = createMessage(role, trimmed);
       finalizeMessage(message);
       return message;
     }
@@ -725,7 +710,9 @@
         const right = Math.min(left + 1, input.length - 1);
         const fraction = position - left;
 
-        output[i] = input[left] * (1 - fraction) + input[right] * fraction;
+        output[i] =
+          input[left] * (1 - fraction) +
+          input[right] * fraction;
       }
 
       return output;
@@ -734,9 +721,8 @@
     function pcmToBase64(floatSamples, sampleRate) {
       const resampled = resampleTo24k(floatSamples, sampleRate);
       const pcm = floatTo16BitPCM(resampled);
-
-      // Conversión binaria por bloques para evitar desbordar el stack.
       const bytes = new Uint8Array(pcm.buffer);
+
       let binary = "";
       const chunkSize = 0x8000;
 
@@ -783,9 +769,9 @@
     }
 
     async function startMicrophone() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error(
-          "Este navegador no permite acceder al micrófono. Utiliza HTTPS o localhost."
+          "No se puede acceder al micrófono. Utiliza HTTPS o localhost."
         );
       }
 
@@ -798,7 +784,8 @@
         }
       });
 
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
 
       if (!AudioContextClass) {
         throw new Error("Este navegador no soporta Web Audio API.");
@@ -817,8 +804,6 @@
         1
       );
 
-      // El nodo de salida queda conectado con volumen cero.
-      // Esto mantiene activo ScriptProcessor sin realimentar el micrófono.
       silentGain = audioContext.createGain();
       silentGain.gain.value = 0;
 
@@ -827,10 +812,10 @@
           return;
         }
 
-        const input = event.inputBuffer.getChannelData(0);
+        const samples = new Float32Array(
+          event.inputBuffer.getChannelData(0)
+        );
 
-        // Copiar porque el buffer del navegador se reutiliza.
-        const samples = new Float32Array(input);
         const audio = pcmToBase64(samples, audioContext.sampleRate);
 
         sendEvent({
@@ -850,11 +835,9 @@
     async function stopMicrophone() {
       if (processor) {
         processor.onaudioprocess = null;
-
         try {
           processor.disconnect();
         } catch (_) {}
-
         processor = null;
       }
 
@@ -862,7 +845,6 @@
         try {
           mediaSource.disconnect();
         } catch (_) {}
-
         mediaSource = null;
       }
 
@@ -870,7 +852,6 @@
         try {
           silentGain.disconnect();
         } catch (_) {}
-
         silentGain = null;
       }
 
@@ -893,10 +874,13 @@
 
     async function ensurePlaybackContext() {
       if (!playbackContext || playbackContext.state === "closed") {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        const AudioContextClass =
+          window.AudioContext || window.webkitAudioContext;
+
         playbackContext = new AudioContextClass({
           sampleRate: TARGET_SAMPLE_RATE
         });
+
         nextPlaybackTime = playbackContext.currentTime;
       }
 
@@ -934,7 +918,6 @@
 
         source.start(startAt);
         nextPlaybackTime = startAt + buffer.duration;
-
         playbackSources.add(source);
 
         source.onended = () => {
@@ -965,7 +948,10 @@
     }
 
     async function connect() {
-      if (isConnecting || (socket && socket.readyState === WebSocket.OPEN)) {
+      if (
+        isConnecting ||
+        (socket && socket.readyState === WebSocket.OPEN)
+      ) {
         return;
       }
 
@@ -994,7 +980,6 @@
             "Acepta el permiso si el navegador lo solicita.",
             true
           );
-          setActivity("WebSocket conectado. Activando micrófono…", "success");
 
           try {
             await startMicrophone();
@@ -1010,17 +995,14 @@
 
             setVoiceState(
               "Escuchando",
-              "Habla con naturalidad. Espera un momento después de terminar.",
+              "Tu mensaje aparecerá cuando termines de hablar.",
               true
             );
-            setActivity("Sesión activa. Ya puedes hablar.", "success");
 
+            setActivity("Sesión activa. Ya puedes hablar.", "success");
             elements.transcriptInfo.textContent = "Esperando tu voz";
             elements.assistantInfo.textContent = "Esperando respuesta";
 
-            // Configuración de sesión de voz. Si tu agente de xAI ya define
-            // estas opciones en el panel, adapta este objeto al esquema
-            // habilitado para tu agente.
             sendEvent({
               type: "session.update",
               session: {
@@ -1062,7 +1044,10 @@
               "No se pudo activar el micrófono",
               error.message || "Revisa los permisos del navegador."
             );
-            setActivity(error.message || "Error al acceder al micrófono.", "error");
+            setActivity(
+              error.message || "Error al acceder al micrófono.",
+              "error"
+            );
 
             try {
               ws.close();
@@ -1079,7 +1064,7 @@
 
           try {
             event = JSON.parse(messageEvent.data);
-          } catch (error) {
+          } catch (_) {
             console.warn("Mensaje WebSocket no JSON:", messageEvent.data);
             return;
           }
@@ -1090,7 +1075,7 @@
         ws.onerror = (event) => {
           console.error("WebSocket error:", event);
           setActivity(
-            "Error en WebSocket. Revisa el backend y los registros del servidor.",
+            "Error en WebSocket. Revisa los registros del servidor.",
             "error"
           );
         };
@@ -1107,7 +1092,11 @@
           updateButtons();
 
           if (!manuallyDisconnected) {
-            setStatus("Desconectado", event.code === 1000 ? "idle" : "error");
+            setStatus(
+              "Desconectado",
+              event.code === 1000 ? "idle" : "error"
+            );
+
             setVoiceState(
               "Conexión cerrada",
               "Pulsa Conectar para iniciar otra sesión."
@@ -1133,7 +1122,7 @@
         setStatus("Error de conexión", "error");
         setVoiceState(
           "No se pudo conectar",
-          "Comprueba que el backend esté desplegado y disponible."
+          "Comprueba que el backend esté disponible."
         );
         setActivity(error.message || "No se pudo iniciar la conexión.", "error");
       }
@@ -1142,7 +1131,6 @@
     async function handleServerEvent(event) {
       const type = event.type || "";
 
-      // Registra eventos para facilitar el diagnóstico sin imprimir audio.
       console.debug("[xAI Realtime]", type, event);
 
       if (type === "error") {
@@ -1160,40 +1148,33 @@
         return;
       }
 
-      // Transcripción final de lo que dijo el usuario.
-      if (type === "conversation.item.input_audio_transcription.completed") {
-        const text = event.transcript || event.text || "";
+      // CORRECCIÓN:
+      // No crear ni actualizar mensajes con transcripciones parciales.
+      // El mensaje del usuario no se muestra durante el habla.
+      if (
+        type === "conversation.item.input_audio_transcription.updated"
+      ) {
+        return;
+      }
 
-        if (text.trim()) {
-          finalizeMessage(currentUserMessage);
+      // Mostrar el mensaje del usuario únicamente cuando xAI confirma
+      // que la transcripción está completa.
+      if (
+        type === "conversation.item.input_audio_transcription.completed"
+      ) {
+        const text = String(event.transcript || event.text || "").trim();
+
+        if (text) {
           addFinalMessage("user", text);
-          currentUserMessage = null;
-
           elements.transcriptInfo.textContent = text;
-          setActivity("Transcripción recibida.", "success");
+
+          setActivity("Transcripción final recibida.", "success");
         }
 
         return;
       }
 
-      // Algunos modelos envían actualizaciones parciales de la transcripción.
-      if (type === "conversation.item.input_audio_transcription.updated") {
-        const text = event.transcript || event.text || "";
-
-        if (text.trim()) {
-          if (!currentUserMessage) {
-            currentUserMessage = createMessage("user", text, true);
-          } else {
-            updateMessage(currentUserMessage, text, true);
-          }
-
-          elements.transcriptInfo.textContent = text;
-        }
-
-        return;
-      }
-
-      // Texto asociado a una respuesta hablada de la IA.
+      // Mostrar progresivamente el texto que genera la IA.
       if (
         type === "response.output_audio_transcript.delta" ||
         type === "response.text.delta" ||
@@ -1203,12 +1184,11 @@
 
         if (delta) {
           if (!currentAssistantMessage) {
-            currentAssistantMessage = createMessage("assistant", delta, true);
+            currentAssistantMessage = createMessage("assistant", delta);
           } else {
             updateMessage(
               currentAssistantMessage,
-              currentAssistantMessage.bubble.textContent + delta,
-              true
+              currentAssistantMessage.bubble.textContent + delta
             );
           }
 
@@ -1223,14 +1203,18 @@
         type === "response.output_audio_transcript.done" ||
         type === "response.output_text.done"
       ) {
-        const finalText = event.transcript || event.text || "";
+        const finalText = String(
+          event.transcript || event.text || ""
+        ).trim();
 
-        if (finalText.trim()) {
-          // Evita reemplazar el texto acumulado por una cadena vacía.
+        if (finalText) {
           if (!currentAssistantMessage) {
-            currentAssistantMessage = createMessage("assistant", finalText, false);
+            currentAssistantMessage = createMessage(
+              "assistant",
+              finalText
+            );
           } else {
-            updateMessage(currentAssistantMessage, finalText, false);
+            updateMessage(currentAssistantMessage, finalText);
           }
 
           finalizeMessage(currentAssistantMessage);
@@ -1241,29 +1225,27 @@
         return;
       }
 
-      // Audio PCM de la respuesta. Se reproduce en orden.
-      if (type === "response.output_audio.delta") {
+      if (
+        type === "response.output_audio.delta" ||
+        type === "response.audio.delta"
+      ) {
         if (event.delta) {
           await playPcmAudio(event.delta);
         }
-        return;
-      }
 
-      if (type === "response.audio.delta") {
-        if (event.delta) {
-          await playPcmAudio(event.delta);
-        }
         return;
       }
 
       if (type === "response.created") {
         currentAssistantMessage = null;
         elements.assistantInfo.textContent = "Generando respuesta…";
+
         setVoiceState(
           "El asistente está respondiendo",
           "Espera mientras genera su respuesta de voz.",
           true
         );
+
         return;
       }
 
@@ -1272,18 +1254,22 @@
         currentAssistantMessage = null;
 
         if (event.response?.status === "failed") {
-          const error = event.response?.status_details?.error?.message ||
+          const error =
+            event.response?.status_details?.error?.message ||
             "No se pudo generar la respuesta.";
 
           setActivity(error, "error");
         } else {
-          setActivity("Respuesta finalizada. Puedes seguir hablando.", "success");
+          setActivity(
+            "Respuesta finalizada. Puedes seguir hablando.",
+            "success"
+          );
         }
 
-        if (sessionStarted) {
+        if (sessionStarted && !isMuted) {
           setVoiceState(
             "Escuchando",
-            "Habla cuando estés listo para continuar.",
+            "Tu mensaje aparecerá cuando termines de hablar.",
             true
           );
         }
@@ -1292,11 +1278,13 @@
       }
 
       if (type === "input_audio_buffer.speech_started") {
+        // Solo cambia el estado visual; no muestra una transcripción.
         setVoiceState(
           "Te estoy escuchando",
-          "Detecté voz. Puedes continuar hablando.",
+          "Habla con naturalidad. El texto aparecerá al terminar.",
           true
         );
+
         setActivity("Se detectó voz entrante.");
         return;
       }
@@ -1304,14 +1292,10 @@
       if (type === "input_audio_buffer.speech_stopped") {
         setVoiceState(
           "Procesando tu mensaje",
-          "Espera un momento mientras preparo la respuesta.",
+          "Esperando la transcripción final.",
           true
         );
-        return;
-      }
 
-      if (type === "conversation.item.created") {
-        // La transcripción se gestiona con los eventos específicos anteriores.
         return;
       }
 
@@ -1351,8 +1335,6 @@
 
       playbackContext = null;
       nextPlaybackTime = 0;
-
-      currentUserMessage = null;
       currentAssistantMessage = null;
 
       updateButtons();
@@ -1379,10 +1361,17 @@
         : "Silenciar micrófono";
 
       if (isMuted) {
-        setVoiceState("Micrófono silenciado", "Pulsa Activar micrófono para hablar.");
+        setVoiceState(
+          "Micrófono silenciado",
+          "Pulsa Activar micrófono para hablar."
+        );
         setActivity("Micrófono silenciado.");
       } else {
-        setVoiceState("Escuchando", "Ya puedes hablar.", true);
+        setVoiceState(
+          "Escuchando",
+          "Tu mensaje aparecerá cuando termines de hablar.",
+          true
+        );
         setActivity("Micrófono activado.", "success");
       }
     }
@@ -1409,7 +1398,6 @@
       elements.conversation.appendChild(empty);
       elements.emptyState = empty;
 
-      currentUserMessage = null;
       currentAssistantMessage = null;
 
       elements.transcriptInfo.textContent = "Esperando audio";
